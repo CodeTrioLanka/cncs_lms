@@ -443,6 +443,14 @@ export default function UserDashboard() {
                 );
               })}
             </nav>
+            <div style={{ marginTop: "auto", padding: "16px", background: "rgba(255,255,255,0.03)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)", fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: "1.5", textAlign: "center", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div>
+                © 2026 design and develop by <a href="https://www.codetriolanka.lk/" target="_blank" rel="noopener noreferrer" style={{ color: "#a5b4fc", textDecoration: "none", fontWeight: "600" }}>CodeTrioLanka</a>. All rights reserved.
+              </div>
+              <div style={{ paddingTop: "8px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                Core Developer is <a href="https://www.codetriolanka.lk/team/chalana-jayod" target="_blank" rel="noopener noreferrer" style={{ color: "#34d399", textDecoration: "none", fontWeight: "600" }}>Chalana Jayod</a>
+              </div>
+            </div>
           </aside>
 
           {/* Main Content Area */}
