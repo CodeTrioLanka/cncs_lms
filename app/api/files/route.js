@@ -39,7 +39,19 @@ export async function GET(request) {
       queryFilter.$or = [{ category: "Others" }, { type: "Other" }];
     } else {
       if (category) queryFilter.category = category;
-      if (type)     queryFilter.type = type;
+      if (type) {
+        if (type === "PDF") {
+          queryFilter.type = { $regex: "pdf", $options: "i" };
+        } else if (type === "Word") {
+          queryFilter.type = { $regex: "doc|word|rtf", $options: "i" };
+        } else if (type === "PowerPoint") {
+          queryFilter.type = { $regex: "ppt|powerpoint|presentation", $options: "i" };
+        } else if (type === "Excel") {
+          queryFilter.type = { $regex: "xls|csv|excel|spreadsheet", $options: "i" };
+        } else {
+          queryFilter.type = { $regex: type, $options: "i" };
+        }
+      }
     }
 
     if (subject) {

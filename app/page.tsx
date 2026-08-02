@@ -326,7 +326,14 @@ export default function Home() {
       return allFilesCount.filter(f => f.category === "Others" || f.type === "Other").length;
     }
     if (item.type) {
-      return allFilesCount.filter(f => f.type === item.type).length;
+      return allFilesCount.filter(f => {
+        const t = (f.type || "").toLowerCase();
+        if (item.type === "PDF") return t.includes("pdf");
+        if (item.type === "Word") return t.includes("doc") || t.includes("word") || t.includes("rtf");
+        if (item.type === "PowerPoint") return t.includes("ppt") || t.includes("powerpoint") || t.includes("presentation");
+        if (item.type === "Excel") return t.includes("xls") || t.includes("csv") || t.includes("excel") || t.includes("spreadsheet");
+        return t.includes(item.type!.toLowerCase());
+      }).length;
     }
     return allFilesCount.filter(f => f.category === item.category).length;
   }
@@ -480,6 +487,40 @@ export default function Home() {
                   <span style={{ fontSize: "3rem" }}>📂</span>
                   <p>No files found in this category. Upload a file or change filters.</p>
                 </div>
+              ) : activeSidebarId === "all" ? (
+                <>
+                  <p className="results-count">{files.length} file{files.length !== 1 ? "s" : ""} found</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "32px", width: "100%" }}>
+                    {Object.entries(
+                      files.reduce((acc, file) => {
+                        let cat = file.category || "Others";
+                        if (cat === "Documents") cat = "PDF";
+                        if (!acc[cat]) acc[cat] = [];
+                        acc[cat].push(file);
+                        return acc;
+                      }, {} as Record<string, LMSFile[]>)
+                    ).map(([category, catFiles]) => (
+                      <div key={category} className="file-category-section">
+                        <h3 style={{ marginBottom: "16px", fontSize: "1.2rem", fontWeight: "600", color: "var(--text-primary)", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>
+                          {category}
+                        </h3>
+                        <div className="file-grid">
+                          {catFiles.map((f) => (
+                            <FileCard
+                              key={f.id}
+                              file={f}
+                              currentUser={currentUser}
+                              onDeleteSuccess={() => {
+                                loadFiles();
+                                loadAllFilesCounts();
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               ) : (
                 <>
                   <p className="results-count">{files.length} file{files.length !== 1 ? "s" : ""} found</p>
