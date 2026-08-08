@@ -683,12 +683,12 @@ export default function UserDashboard() {
               </a>
               . All rights reserved.
             </div>
-            <div>
+            {/* <div>
               Core Developer is{" "}
               <a href="https://www.codetriolanka.lk/team/chalana-jayod" target="_blank" rel="noopener noreferrer" className="app-footer-dev">
                 CJ
               </a>
-            </div>
+            </div> */}
           </div>
         </footer>
       </div>

@@ -1101,10 +1101,19 @@ body {
     overflow-y: auto;
   }
   
+  .subj-page {
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+    flex: none;
+  }
+
   .dashboard-body {
     flex-direction: column;
     height: auto;
+    min-height: auto;
     overflow: visible;
+    flex: none;
   }
 
   .sidebar {
@@ -1148,6 +1157,14 @@ body {
 
   .main-content-area {
     height: auto;
+    min-height: auto;
+    overflow: visible;
+    flex: none;
+  }
+
+  .subj-grid-wrap {
+    height: auto;
+    min-height: auto;
     overflow: visible;
   }
 }
