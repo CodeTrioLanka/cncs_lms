@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import StorageModal from "@/app/components/StorageModal";
 import UploadModal from "@/app/components/UploadModal";
+import FilePreviewModal from "@/app/components/FilePreviewModal";
 
 // ── Types & Interfaces ────────────────────────────────────────────────────────
 export interface LMSUser {
@@ -13,9 +14,11 @@ export interface LMSUser {
 }
 
 export interface LMSFile {
-  id: number;
+  id: number | string;
   drive_file_id: string;
   drive_url: string;
+  youtube_url?: string;
+  storage_type?: string;
   name: string;
   category: string;
   type: string;
@@ -100,13 +103,24 @@ function FileCard({
   file,
   currentUser,
   onDeleteSuccess,
+  onPreviewFile,
 }: {
   file: LMSFile;
   currentUser: LMSUser | null;
   onDeleteSuccess?: () => void;
+  onPreviewFile?: (file: LMSFile) => void;
 }) {
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const style = TYPE_COLORS[file.type] || { bg: "#e2e8f0", text: "#334155", icon: "📄" };
+
+  const isVideo =
+    file.storage_type === "YOUTUBE" ||
+    Boolean(file.youtube_url) ||
+    file.type === "Video" ||
+    Boolean(
+      file.drive_url &&
+        (file.drive_url.includes("youtube.com") || file.drive_url.includes("youtu.be"))
+    );
 
   const isOwner =
     currentUser &&
@@ -130,6 +144,13 @@ function FileCard({
     }
   }
 
+  function handleCardClick(e: React.MouseEvent) {
+    if (onPreviewFile) {
+      e.preventDefault();
+      onPreviewFile(file);
+    }
+  }
+
   return (
     <div
       className="file-card"
@@ -137,12 +158,11 @@ function FileCard({
     >
       <a
         href={file.drive_url}
-        target="_blank"
-        rel="noopener noreferrer"
+        onClick={handleCardClick}
         style={{ display: "flex", alignItems: "center", gap: "14px", textDecoration: "none", color: "inherit", flex: 1, minWidth: 0 }}
       >
         <div className="file-card-icon" style={{ background: style.bg }}>
-          <span>{style.icon}</span>
+          <span>{isVideo ? "🎬" : style.icon}</span>
         </div>
         <div className="file-card-body">
           <p className="file-name">{file.name}</p>
@@ -160,7 +180,6 @@ function FileCard({
             {isDeleting ? "⏳" : "🗑️"}
           </button>
         )}
-        <a href={file.drive_url} target="_blank" rel="noopener noreferrer" className="file-card-arrow" style={{ textDecoration: "none" }}>↗</a>
       </div>
     </div>
   );
@@ -178,6 +197,7 @@ export default function Home() {
   const [loading, setLoading] = useState<boolean>(false);
   const [showModal, setModal] = useState<boolean>(false);
   const [showStorageModal, setStorageModal] = useState<boolean>(false);
+  const [previewFile, setPreviewFile] = useState<LMSFile | null>(null);
 
   // ── View state: "cards" = File Type Cards grid, "files" = filtered file view ──
   const [view, setView] = useState<"cards" | "files">("cards");
@@ -530,6 +550,7 @@ export default function Home() {
                                 loadAllFiles();
                                 loadFilteredFiles(sidebarSubject, activeTypeId, search);
                               }}
+                              onPreviewFile={(targetFile) => setPreviewFile(targetFile)}
                             />
                           ))}
                         </div>
@@ -577,6 +598,9 @@ export default function Home() {
       )}
       {showStorageModal && (
         <StorageModal onClose={() => setStorageModal(false)} />
+      )}
+      {previewFile && (
+        <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
       )}
     </>
   );
