@@ -20,6 +20,7 @@ export interface LMSFile {
   drive_url: string;
   youtube_url?: string;
   storage_type?: string;
+  google_drive_id?: string;
   name: string;
   category: string;
   type: string;
@@ -35,28 +36,7 @@ export interface Subject {
   created_at?: string;
 }
 
-interface FileTypeFilterItem {
-  id: string;
-  label: string;
-  icon: string;
-  category: string;
-  type?: string;
-}
-
-// ── File Types for Dashboard Filter Bar ─────────────────────────────────────────
-const FILE_TYPE_FILTERS: FileTypeFilterItem[] = [
-  { id: "all", label: "All Files", icon: "📁", category: "All" },
-  { id: "pdf", label: "PDFs", icon: "📄", category: "Documents", type: "PDF" },
-  { id: "word", label: "Word Docs", icon: "📝", category: "Documents", type: "Word" },
-  { id: "ppt", label: "PowerPoint", icon: "📊", category: "Documents", type: "PowerPoint" },
-  { id: "excel", label: "Excel Sheets", icon: "📈", category: "Documents", type: "Excel" },
-  { id: "videos", label: "Videos", icon: "🎬", category: "Videos" },
-  { id: "images", label: "Images", icon: "🖼️", category: "Images" },
-  { id: "audio", label: "Audio", icon: "🎵", category: "Audio" },
-  { id: "assignments", label: "Assignments", icon: "📋", category: "Assignments" },
-  { id: "others", label: "Others", icon: "📦", category: "Others" },
-];
-
+// ── Subject icon hints based on name keywords ────────────────────────────────
 function getSubjectIcon(name: string): string {
   const n = name.toLowerCase();
   if (n.includes("network")) return "🌐";
@@ -74,6 +54,7 @@ function getSubjectIcon(name: string): string {
   return "📚";
 }
 
+// ── Type badge colors ─────────────────────────────────────────────────────────
 const TYPE_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
   PDF: { bg: "#fee2e2", text: "#b91c1c", icon: "📄" },
   Word: { bg: "#dbeafe", text: "#1d4ed8", icon: "📝" },
@@ -91,6 +72,20 @@ const TYPE_COLORS: Record<string, { bg: string; text: string; icon: string }> = 
   SQL: { bg: "#cff4fc", text: "#055160", icon: "🗄️" },
   Other: { bg: "#f1f5f9", text: "#475569", icon: "📁" },
 };
+
+// ── File Type Cards Definition ──────────────────────────────────────────────
+const FILE_TYPE_CARDS = [
+  { id: "all", label: "All Files", icon: "📁", category: "All", type: "All", grad: "linear-gradient(135deg,#6366f1,#818cf8)", glow: "rgba(99,102,241,0.35)" },
+  { id: "pdf", label: "PDFs", icon: "📄", category: "Documents", type: "PDF", grad: "linear-gradient(135deg,#ef4444,#f87171)", glow: "rgba(239,68,68,0.35)" },
+  { id: "word", label: "Word Docs", icon: "📝", category: "Documents", type: "Word", grad: "linear-gradient(135deg,#0ea5e9,#38bdf8)", glow: "rgba(14,165,233,0.35)" },
+  { id: "ppt", label: "PowerPoint", icon: "📊", category: "Documents", type: "PowerPoint", grad: "linear-gradient(135deg,#f97316,#fb923c)", glow: "rgba(249,115,22,0.35)" },
+  { id: "excel", label: "Excel Sheets", icon: "📈", category: "Documents", type: "Excel", grad: "linear-gradient(135deg,#10b981,#34d399)", glow: "rgba(16,185,129,0.35)" },
+  { id: "video", label: "Videos", icon: "🎬", category: "Videos", type: "All", grad: "linear-gradient(135deg,#8b5cf6,#a78bfa)", glow: "rgba(139,92,246,0.35)" },
+  { id: "image", label: "Images", icon: "🖼️", category: "Images", type: "All", grad: "linear-gradient(135deg,#ec4899,#f472b6)", glow: "rgba(236,72,153,0.35)" },
+  { id: "audio", label: "Audio", icon: "🎵", category: "Audio", type: "All", grad: "linear-gradient(135deg,#a855f7,#c084fc)", glow: "rgba(168,85,247,0.35)" },
+  { id: "assign", label: "Assignments", icon: "📋", category: "Assignments", type: "All", grad: "linear-gradient(135deg,#f59e0b,#fbbf24)", glow: "rgba(245,158,11,0.35)" },
+  { id: "other", label: "Others", icon: "📦", category: "Others", type: "All", grad: "linear-gradient(135deg,#14b8a6,#2dd4bf)", glow: "rgba(20,184,166,0.35)" },
+];
 
 function formatBytes(bytes: number): string {
   if (!bytes || bytes === 0) return "0 B";
@@ -231,21 +226,20 @@ export default function UserDashboard() {
   const [currentUser, setCurrentUser] = useState<LMSUser | null>(null);
   const [authChecking, setAuthCheck] = useState<boolean>(true);
 
-  const [files, setFiles] = useState<LMSFile[]>([]);
   const [myFilesAll, setMyFilesAll] = useState<LMSFile[]>([]);
+  const [files, setFiles] = useState<LMSFile[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [showModal, setModal] = useState<boolean>(false);
   const [showStorageModal, setStorageModal] = useState<boolean>(false);
   const [previewFile, setPreviewFile] = useState<LMSFile | null>(null);
 
-  // Filters
-  const [subFilter, setSubFilter] = useState<string>("All"); // Subject filter from Sidebar
-  const [activeTypeId, setActiveTypeId] = useState<string>("all"); // File type filter from top bar
-  const [catFilter, setCatFilter] = useState<string>("All");
-  const [typeFilter, setTypeFilter] = useState<string>("All");
+  // ── View State & Filters ──
+  const [view, setView] = useState<"cards" | "files">("cards");
+  const [sidebarSubject, setSidebarSubject] = useState<string>("All");
+  const [activeTypeId, setActiveType] = useState<string>("all");
   const [search, setSearch] = useState<string>("");
-  const [subjectSearch, setSubjectSearch] = useState<string>(""); // Search filter for sidebar subjects
+  const [subjectSearch, setSubjectSearch] = useState<string>("");
 
   async function checkUserAuth() {
     try {
@@ -289,17 +283,18 @@ export default function UserDashboard() {
     }
   }
 
-  async function loadFilteredUserFiles() {
+  async function loadFilteredUserFiles(subject: string, typeId: string, searchQ: string) {
     if (!currentUser) return;
     setLoading(true);
 
     const params = new URLSearchParams();
     params.set("userEmail", currentUser.email);
+    if (subject && subject !== "All") params.set("subject", subject);
 
-    if (subFilter !== "All") params.set("subject", subFilter);
-    if (catFilter !== "All") params.set("category", catFilter);
-    if (typeFilter !== "All") params.set("type", typeFilter);
-    if (search.trim()) params.set("search", search.trim());
+    const ft = FILE_TYPE_CARDS.find((f) => f.id === typeId);
+    if (ft && ft.category !== "All") params.set("category", ft.category);
+    if (ft && ft.type !== "All") params.set("type", ft.type);
+    if (searchQ.trim()) params.set("search", searchQ.trim());
 
     try {
       const res = await fetch(`/api/files?${params}`);
@@ -320,47 +315,48 @@ export default function UserDashboard() {
   useEffect(() => {
     if (!authChecking && currentUser) {
       loadAllUserFiles(currentUser.email);
-      loadFilteredUserFiles();
     }
-  }, [authChecking, currentUser, subFilter, catFilter, typeFilter, search]);
+  }, [authChecking, currentUser]);
 
-  function handleSelectFileType(item: FileTypeFilterItem) {
-    setActiveTypeId(item.id);
-    setCatFilter(item.category);
-    setTypeFilter(item.type || "All");
+  useEffect(() => {
+    if (!authChecking && currentUser && view === "files") {
+      loadFilteredUserFiles(sidebarSubject, activeTypeId, search);
+    }
+  }, [authChecking, currentUser, view, sidebarSubject, activeTypeId, search]);
+
+  function openFileType(typeId: string) {
+    setActiveType(typeId);
+    setSearch("");
+    setView("files");
   }
 
-  function countFilesForSubject(subjectName: string): number {
+  function goBackToCards() {
+    setView("cards");
+    setActiveType("all");
+    setSearch("");
+    setFiles([]);
+  }
+
+  function countForFileTypeCard(ft: (typeof FILE_TYPE_CARDS)[0]): number {
+    return myFilesAll.filter((f) => {
+      if (sidebarSubject !== "All" && (f.subject || "").toLowerCase() !== sidebarSubject.toLowerCase()) {
+        return false;
+      }
+      if (ft.category === "All") return true;
+      if (ft.type !== "All") return (f.type || "").toLowerCase().includes(ft.type.toLowerCase());
+      return (f.category || "") === ft.category;
+    }).length;
+  }
+
+  function countForSubjectSidebar(subjectName: string): number {
     if (subjectName === "All") return myFilesAll.length;
     return myFilesAll.filter(
       (f) => (f.subject || "").toLowerCase() === subjectName.toLowerCase()
     ).length;
   }
 
-  function countFilesForType(item: FileTypeFilterItem): number {
-    const matchingSubjectFiles = myFilesAll.filter(f => {
-      if (subFilter === "All") return true;
-      return (f.subject || "").toLowerCase() === subFilter.toLowerCase();
-    });
-
-    if (item.category === "All") return matchingSubjectFiles.length;
-    if (item.id === "others" || item.category === "Others" || item.type === "Other") {
-      return matchingSubjectFiles.filter(f => f.category === "Others" || f.type === "Other").length;
-    }
-    if (item.type) {
-      return matchingSubjectFiles.filter(f => {
-        const t = (f.type || "").toLowerCase();
-        if (item.type === "PDF") return t.includes("pdf");
-        if (item.type === "Word") return t.includes("doc") || t.includes("word") || t.includes("rtf");
-        if (item.type === "PowerPoint") return t.includes("ppt") || t.includes("powerpoint") || t.includes("presentation");
-        if (item.type === "Excel") return t.includes("xls") || t.includes("csv") || t.includes("excel") || t.includes("spreadsheet");
-        return t.includes(item.type!.toLowerCase());
-      }).length;
-    }
-    return matchingSubjectFiles.filter(f => f.category === item.category).length;
-  }
-
   const totalBytes = myFilesAll.reduce((sum, f) => sum + (f.size_bytes || 0), 0);
+  const activeFileTypeObj = FILE_TYPE_CARDS.find((ft) => ft.id === activeTypeId) || FILE_TYPE_CARDS[0];
 
   if (authChecking) {
     return (
@@ -456,190 +452,208 @@ export default function UserDashboard() {
         </div>
 
         {/* ── Dashboard Body (Subject Sidebar + Files Content) ── */}
-        <div className="dashboard-body">
-          {/* Left Subject Sidebar */}
-          <aside className="sidebar">
-            <h2 className="sidebar-title">My Subjects</h2>
+        <div className="subj-page">
+          <div className="dashboard-body" style={{ flex: 1 }}>
+            {/* Left Subject Sidebar */}
+            <aside className="sidebar">
+              <h2 className="sidebar-title">My Subjects</h2>
 
-            {/* Sidebar Subject Search */}
-            <div style={{ padding: "0 4px", marginBottom: "4px" }}>
-              <div className="search-wrap" style={{ minWidth: "100%" }}>
-                <span className="search-icon" style={{ fontSize: "0.8rem", left: "10px" }}>🔍</span>
-                <input
-                  className="search-input"
-                  placeholder="Search my subjects…"
-                  value={subjectSearch}
-                  onChange={(e) => setSubjectSearch(e.target.value)}
-                  style={{ fontSize: "0.8rem", padding: "6px 8px 6px 30px", borderRadius: "8px" }}
-                />
-              </div>
-            </div>
-
-            <nav className="sidebar-nav">
-              {/* All Subjects Option */}
-              {(!subjectSearch || "all my subjects".includes(subjectSearch.toLowerCase())) && (
-                <button
-                  type="button"
-                  className={`sidebar-item ${subFilter === "All" ? "active" : ""}`}
-                  onClick={() => setSubFilter("All")}
-                >
-                  <span className="sidebar-item-label">
-                    <span className="sidebar-icon">📚</span>
-                    <span>All My Subjects</span>
-                  </span>
-                  <span className="sidebar-count">{countFilesForSubject("All")}</span>
-                </button>
-              )}
-
-              {/* Dynamic Subject Items */}
-              {subjects
-                .filter((s) => s.name.toLowerCase().includes(subjectSearch.toLowerCase()))
-                .map((s) => {
-                  const isActive = subFilter.toLowerCase() === s.name.toLowerCase();
-                  const icon = getSubjectIcon(s.name);
-                  const count = countFilesForSubject(s.name);
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      className={`sidebar-item ${isActive ? "active" : ""}`}
-                      onClick={() => setSubFilter(s.name)}
-                    >
-                      <span className="sidebar-item-label">
-                        <span className="sidebar-icon">{icon}</span>
-                        <span>{s.name}</span>
-                      </span>
-                      <span className="sidebar-count">{count}</span>
-                    </button>
-                  );
-                })}
-            </nav>
-          </aside>
-
-          {/* Main Content Area */}
-          <div className="main-content-area">
-            {/* Top Filter Bar (Search + File Type Pills) */}
-            <div className="filter-bar">
-              <div className="filter-inner">
-                <div className="search-wrap">
-                  <span className="search-icon">🔍</span>
+              {/* Sidebar Subject Search */}
+              <div style={{ padding: "0 4px", marginBottom: "4px" }}>
+                <div className="search-wrap" style={{ minWidth: "100%" }}>
+                  <span className="search-icon" style={{ fontSize: "0.8rem", left: "10px" }}>🔍</span>
                   <input
                     className="search-input"
-                    placeholder="Search my files…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search my subjects…"
+                    value={subjectSearch}
+                    onChange={(e) => setSubjectSearch(e.target.value)}
+                    style={{ fontSize: "0.8rem", padding: "6px 8px 6px 30px", borderRadius: "8px" }}
                   />
                 </div>
+              </div>
 
-                {/* File Type Filter Pills */}
-                <div className="subject-filters-bar">
-                  <span className="subject-filter-label">File Type:</span>
-                  {FILE_TYPE_FILTERS.map((item) => {
-                    const isActive = activeTypeId === item.id;
-                    const count = countFilesForType(item);
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={`subject-pill ${isActive ? "active" : ""}`}
-                        onClick={() => handleSelectFileType(item)}
-                      >
-                        <span>{item.icon}</span>
-                        {item.label}
-                        <span className="subject-pill-count">{count}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {(subFilter !== "All" || activeTypeId !== "all" || search) && (
+              <nav className="sidebar-nav">
+                {/* All Subjects Option */}
+                {(!subjectSearch || "all my subjects".includes(subjectSearch.toLowerCase())) && (
                   <button
-                    className="btn-clear"
+                    type="button"
+                    className={`sidebar-item ${sidebarSubject === "All" ? "active" : ""}`}
                     onClick={() => {
-                      setSubFilter("All");
-                      setActiveTypeId("all");
-                      setCatFilter("All");
-                      setTypeFilter("All");
+                      setSidebarSubject("All");
+                      setView("cards");
+                      setActiveType("all");
                       setSearch("");
                     }}
                   >
-                    ✕ Clear Filters
+                    <span className="sidebar-item-label">
+                      <span className="sidebar-icon">📚</span>
+                      <span>All My Subjects</span>
+                    </span>
+                    <span className="sidebar-count">{countForSubjectSidebar("All")}</span>
                   </button>
                 )}
-              </div>
-            </div>
 
-            {/* File Grid */}
-            <main className="main">
-              {loading ? (
-                <div className="state-msg">
-                  <span className="spinner" />
-                  <p>Loading your files…</p>
+                {/* Dynamic Subject Items */}
+                {subjects
+                  .filter((s) => s.name.toLowerCase().includes(subjectSearch.toLowerCase()))
+                  .map((s) => {
+                    const isActive = sidebarSubject.toLowerCase() === s.name.toLowerCase();
+                    const icon = getSubjectIcon(s.name);
+                    const count = countForSubjectSidebar(s.name);
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className={`sidebar-item ${isActive ? "active" : ""}`}
+                        onClick={() => {
+                          setSidebarSubject(s.name);
+                          setView("cards");
+                          setActiveType("all");
+                          setSearch("");
+                        }}
+                      >
+                        <span className="sidebar-item-label">
+                          <span className="sidebar-icon">{icon}</span>
+                          <span>{s.name}</span>
+                        </span>
+                        <span className="sidebar-count">{count}</span>
+                      </button>
+                    );
+                  })}
+              </nav>
+            </aside>
+
+            {/* Main Content Area */}
+            <div className="main-content-area">
+              {/* ══════════════════════════════════════════════════════════════ */}
+              {/* VIEW 1 — File Types Card Grid                                  */}
+              {/* ══════════════════════════════════════════════════════════════ */}
+              {view === "cards" && (
+                <div className="subj-grid-wrap">
+                  <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div>
+                      <h2 style={{ fontSize: "1.4rem", fontWeight: "800", color: "var(--text-primary)" }}>
+                        My File Categories &amp; Types
+                      </h2>
+                      <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                        {sidebarSubject === "All"
+                          ? "Showing your uploaded file types across all subjects"
+                          : `Showing your uploaded file types for subject: ${sidebarSubject}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="subj-grid">
+                    {FILE_TYPE_CARDS.map((ft) => {
+                      const count = countForFileTypeCard(ft);
+                      return (
+                        <button
+                          key={ft.id}
+                          type="button"
+                          className="subj-card"
+                          style={{ "--subj-glow": ft.glow, "--subj-grad": ft.grad } as React.CSSProperties}
+                          onClick={() => openFileType(ft.id)}
+                        >
+                          <div className="subj-card-icon-wrap" style={{ background: ft.grad }}>
+                            <span className="subj-card-icon">{ft.icon}</span>
+                          </div>
+                          <div className="subj-card-body">
+                            <p className="subj-card-name">{ft.label}</p>
+                            <p className="subj-card-count">{count} file{count !== 1 ? "s" : ""}</p>
+                          </div>
+                          <span className="subj-card-arrow">→</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              ) : files.length === 0 ? (
-                <div className="state-msg">
-                  <span style={{ fontSize: "3rem" }}>📂</span>
-                  <p>No files uploaded in this subject yet. Click &quot;Upload File&quot; to add your first file!</p>
-                </div>
-              ) : activeTypeId === "all" ? (
-                <>
-                  <p className="results-count">
-                    {files.length} file{files.length !== 1 ? "s" : ""} {subFilter !== "All" && `in ${subFilter}`}
-                  </p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "32px", width: "100%" }}>
-                    {Object.entries(
-                      files.reduce((acc, file) => {
-                        let cat = file.category || "Others";
-                        if (cat === "Documents") cat = "PDF";
-                        if (!acc[cat]) acc[cat] = [];
-                        acc[cat].push(file);
-                        return acc;
-                      }, {} as Record<string, LMSFile[]>)
-                    ).map(([category, catFiles]) => (
-                      <div key={category} className="file-category-section">
-                        <h3 style={{ marginBottom: "16px", fontSize: "1.2rem", fontWeight: "600", color: "var(--text-primary)", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>
-                          {category}
-                        </h3>
+              )}
+
+              {/* ══════════════════════════════════════════════════════════════ */}
+              {/* VIEW 2 — Files for Selected File Type & Subject                 */}
+              {/* ══════════════════════════════════════════════════════════════ */}
+              {view === "files" && (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                  {/* File Type & Subject Banner */}
+                  <div className="subj-banner">
+                    <div className="subj-banner-inner">
+                      <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                        <div className="subj-banner-icon">
+                          <span style={{ fontSize: "1.6rem" }}>{activeFileTypeObj.icon}</span>
+                        </div>
+                        <div>
+                          <p style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: "2px" }}>
+                            {sidebarSubject === "All" ? "All Subjects" : `Subject: ${sidebarSubject}`}
+                          </p>
+                          <h2 className="subj-banner-title">{activeFileTypeObj.label}</h2>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-clear"
+                        onClick={goBackToCards}
+                        style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+                      >
+                        ← Back to Categories
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Filter bar (search + clear) */}
+                  <div className="filter-bar">
+                    <div className="filter-inner" style={{ alignItems: "center" }}>
+                      <div className="search-wrap">
+                        <span className="search-icon">🔍</span>
+                        <input
+                          className="search-input"
+                          placeholder={`Search my ${activeFileTypeObj.label} in ${sidebarSubject}…`}
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                        />
+                      </div>
+                      {search && (
+                        <button className="btn-clear" onClick={() => setSearch("")}>✕ Clear</button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* File Grid Content */}
+                  <main className="main">
+                    {loading ? (
+                      <div className="state-msg">
+                        <span className="spinner" />
+                        <p>Loading your files…</p>
+                      </div>
+                    ) : files.length === 0 ? (
+                      <div className="state-msg">
+                        <span style={{ fontSize: "3rem" }}>📂</span>
+                        <p>No files found for <strong>{activeFileTypeObj.label}</strong> {sidebarSubject !== "All" && `in ${sidebarSubject}`}. Try changing filters or uploading a file!</p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="results-count">
+                          {files.length} file{files.length !== 1 ? "s" : ""} found for <strong style={{ color: "var(--text-primary)" }}>{activeFileTypeObj.label}</strong> {sidebarSubject !== "All" && `in ${sidebarSubject}`}
+                        </p>
                         <div className="file-grid">
-                          {catFiles.map((f) => (
+                          {files.map((f) => (
                             <FileCard
                               key={f.id}
                               file={f}
                               currentUser={currentUser}
                               onDeleteSuccess={() => {
                                 if (currentUser) loadAllUserFiles(currentUser.email);
-                                loadFilteredUserFiles();
+                                loadFilteredUserFiles(sidebarSubject, activeTypeId, search);
                               }}
                               onPreviewFile={(targetFile) => setPreviewFile(targetFile)}
                             />
                           ))}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className="results-count">
-                    {files.length} file{files.length !== 1 ? "s" : ""} {subFilter !== "All" && `in ${subFilter}`}
-                  </p>
-                  <div className="file-grid">
-                    {files.map((f) => (
-                      <FileCard
-                        key={f.id}
-                        file={f}
-                        currentUser={currentUser}
-                        onDeleteSuccess={() => {
-                          if (currentUser) loadAllUserFiles(currentUser.email);
-                          loadFilteredUserFiles();
-                        }}
-                        onPreviewFile={(targetFile) => setPreviewFile(targetFile)}
-                      />
-                    ))}
-                  </div>
-                </>
+                      </>
+                    )}
+                  </main>
+                </div>
               )}
-            </main>
+            </div>
           </div>
         </div>
 
@@ -671,7 +685,7 @@ export default function UserDashboard() {
           onClose={() => setModal(false)}
           onSuccess={() => {
             if (currentUser) loadAllUserFiles(currentUser.email);
-            loadFilteredUserFiles();
+            if (view === "files") loadFilteredUserFiles(sidebarSubject, activeTypeId, search);
             loadSubjects();
           }}
         />
