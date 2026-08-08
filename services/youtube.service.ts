@@ -240,7 +240,7 @@ export async function updateYouTubeVideoMetadata(
 
     // Generate clean tags for the new subject, completely replacing old subject tags
     const subjectTag = newSubject.trim().toLowerCase().replace(/\s+/g, "-");
-    const updatedTags = ["cncs", "lms", `subject-${subjectTag}`, newSubject];
+    const updatedTags = [newSubject];
 
     await youtube.videos.update({
         part: ["snippet"],
@@ -254,4 +254,4 @@ export async function updateYouTubeVideoMetadata(
             },
         },
     });
-}
+}
