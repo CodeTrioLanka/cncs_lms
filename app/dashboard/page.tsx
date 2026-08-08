@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import StorageModal from "@/app/components/StorageModal";
@@ -32,12 +32,7 @@ export interface Subject {
   created_at?: string;
 }
 
-export interface DetectedInfo {
-  category: string;
-  type: string;
-}
-
-interface SidebarCategoryItem {
+interface FileTypeFilterItem {
   id: string;
   label: string;
   icon: string;
@@ -45,36 +40,53 @@ interface SidebarCategoryItem {
   type?: string;
 }
 
-// ── Sidebar Categories ────────────────────────────────────────────────────────
-const SIDEBAR_ITEMS: SidebarCategoryItem[] = [
-  { id: "all",         label: "All My Files",   icon: "📁", category: "All" },
-  { id: "pdf",         label: "My PDFs",        icon: "📄", category: "Documents",   type: "PDF" },
-  { id: "word",        label: "My Word Docs",   icon: "📝", category: "Documents",   type: "Word" },
-  { id: "ppt",         label: "My PowerPoint",  icon: "📊", category: "Documents",   type: "PowerPoint" },
-  { id: "excel",       label: "My Excel Sheets",icon: "📈", category: "Documents",   type: "Excel" },
-  { id: "videos",      label: "My Videos",      icon: "🎬", category: "Videos" },
-  { id: "images",      label: "My Images",      icon: "🖼️", category: "Images" },
-  { id: "audio",       label: "My Audio",       icon: "🎵", category: "Audio" },
-  { id: "assignments", label: "My Assignments", icon: "📋", category: "Assignments" },
-  { id: "others",      label: "My Others",      icon: "📁", category: "Others" },
+// ── File Types for Dashboard Filter Bar ─────────────────────────────────────────
+const FILE_TYPE_FILTERS: FileTypeFilterItem[] = [
+  { id: "all", label: "All Files", icon: "📁", category: "All" },
+  { id: "pdf", label: "PDFs", icon: "📄", category: "Documents", type: "PDF" },
+  { id: "word", label: "Word Docs", icon: "📝", category: "Documents", type: "Word" },
+  { id: "ppt", label: "PowerPoint", icon: "📊", category: "Documents", type: "PowerPoint" },
+  { id: "excel", label: "Excel Sheets", icon: "📈", category: "Documents", type: "Excel" },
+  { id: "videos", label: "Videos", icon: "🎬", category: "Videos" },
+  { id: "images", label: "Images", icon: "🖼️", category: "Images" },
+  { id: "audio", label: "Audio", icon: "🎵", category: "Audio" },
+  { id: "assignments", label: "Assignments", icon: "📋", category: "Assignments" },
+  { id: "others", label: "Others", icon: "📦", category: "Others" },
 ];
 
+function getSubjectIcon(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes("network")) return "🌐";
+  if (n.includes("program") || n.includes("code") || n.includes("software")) return "💻";
+  if (n.includes("math")) return "📐";
+  if (n.includes("system") || n.includes("info")) return "🖥️";
+  if (n.includes("database") || n.includes("sql")) return "🗄️";
+  if (n.includes("security")) return "🔐";
+  if (n.includes("web")) return "🌍";
+  if (n.includes("cloud")) return "☁️";
+  if (n.includes("ai") || n.includes("machine") || n.includes("data")) return "🤖";
+  if (n.includes("hand") || n.includes("book")) return "📖";
+  if (n.includes("engineer")) return "⚙️";
+  if (n.includes("assign")) return "📋";
+  return "📚";
+}
+
 const TYPE_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
-  PDF:         { bg: "#fee2e2", text: "#b91c1c", icon: "📄" },
-  Word:        { bg: "#dbeafe", text: "#1d4ed8", icon: "📝" },
-  PowerPoint:  { bg: "#ffedd5", text: "#c2410c", icon: "📊" },
-  Excel:       { bg: "#dcfce7", text: "#15803d", icon: "📈" },
-  Video:       { bg: "#ede9fe", text: "#7c3aed", icon: "🎬" },
-  Image:       { bg: "#fce7f3", text: "#be185d", icon: "🖼️" },
-  Assignment:  { bg: "#fef9c3", text: "#a16207", icon: "📋" },
-  JSON:        { bg: "#fef3c7", text: "#d97706", icon: "⚙️" },
-  Text:        { bg: "#e0f2fe", text: "#0369a1", icon: "📜" },
-  Audio:       { bg: "#f3e8ff", text: "#7e22ce", icon: "🎵" },
-  Archive:     { bg: "#ffedd5", text: "#9a3412", icon: "📦" },
-  Code:        { bg: "#e0e7ff", text: "#4338ca", icon: "💻" },
-  Python:      { bg: "#dcfce7", text: "#166534", icon: "🐍" },
-  SQL:         { bg: "#cff4fc", text: "#055160", icon: "🗄️" },
-  Other:       { bg: "#f1f5f9", text: "#475569", icon: "📁" },
+  PDF: { bg: "#fee2e2", text: "#b91c1c", icon: "📄" },
+  Word: { bg: "#dbeafe", text: "#1d4ed8", icon: "📝" },
+  PowerPoint: { bg: "#ffedd5", text: "#c2410c", icon: "📊" },
+  Excel: { bg: "#dcfce7", text: "#15803d", icon: "📈" },
+  Video: { bg: "#ede9fe", text: "#7c3aed", icon: "🎬" },
+  Image: { bg: "#fce7f3", text: "#be185d", icon: "🖼️" },
+  Assignment: { bg: "#fef9c3", text: "#a16207", icon: "📋" },
+  JSON: { bg: "#fef3c7", text: "#d97706", icon: "⚙️" },
+  Text: { bg: "#e0f2fe", text: "#0369a1", icon: "📜" },
+  Audio: { bg: "#f3e8ff", text: "#7e22ce", icon: "🎵" },
+  Archive: { bg: "#ffedd5", text: "#9a3412", icon: "📦" },
+  Code: { bg: "#e0e7ff", text: "#4338ca", icon: "💻" },
+  Python: { bg: "#dcfce7", text: "#166534", icon: "🐍" },
+  SQL: { bg: "#cff4fc", text: "#055160", icon: "🗄️" },
+  Other: { bg: "#f1f5f9", text: "#475569", icon: "📁" },
 };
 
 function formatBytes(bytes: number): string {
@@ -206,25 +218,26 @@ function FileCard({
 export default function UserDashboard() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<LMSUser | null>(null);
-  const [authChecking, setAuthCheck]  = useState<boolean>(true);
+  const [authChecking, setAuthCheck] = useState<boolean>(true);
 
-  const [files,          setFiles]        = useState<LMSFile[]>([]);
-  const [myFilesAll,     setMyFilesAll]   = useState<LMSFile[]>([]);
-  const [subjects,       setSubjects]     = useState<Subject[]>([]);
-  const [loading,        setLoading]      = useState<boolean>(true);
-  const [showModal,      setModal]        = useState<boolean>(false);
+  const [files, setFiles] = useState<LMSFile[]>([]);
+  const [myFilesAll, setMyFilesAll] = useState<LMSFile[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [showModal, setModal] = useState<boolean>(false);
 
   // Filters
-  const [activeSidebarId, setActiveSidebar] = useState<string>("all");
-  const [catFilter,       setCat]           = useState<string>("All");
-  const [typeFilter,      setType]          = useState<string>("All");
-  const [subFilter,       setSub]           = useState<string>("All");
-  const [search,          setSearch]        = useState<string>("");
+  const [subFilter, setSubFilter] = useState<string>("All"); // Subject filter from Sidebar
+  const [activeTypeId, setActiveTypeId] = useState<string>("all"); // File type filter from top bar
+  const [catFilter, setCatFilter] = useState<string>("All");
+  const [typeFilter, setTypeFilter] = useState<string>("All");
+  const [search, setSearch] = useState<string>("");
+  const [subjectSearch, setSubjectSearch] = useState<string>(""); // Search filter for sidebar subjects
   const [showStorageModal, setStorageModal] = useState<boolean>(false);
 
   async function checkUserAuth() {
     try {
-      const res  = await fetch("/api/auth/me");
+      const res = await fetch("/api/auth/me");
       const data = await res.json();
 
       if (data.success && data.user) {
@@ -233,7 +246,7 @@ export default function UserDashboard() {
       } else {
         router.push("/login");
       }
-    } catch (err) {
+    } catch {
       router.push("/login");
     }
   }
@@ -246,7 +259,7 @@ export default function UserDashboard() {
 
   async function loadSubjects() {
     try {
-      const res  = await fetch("/api/subjects");
+      const res = await fetch("/api/subjects");
       const data = await res.json();
       if (data.success) setSubjects(data.subjects);
     } catch (err) {
@@ -256,7 +269,7 @@ export default function UserDashboard() {
 
   async function loadAllUserFiles(email: string) {
     try {
-      const res  = await fetch(`/api/files?userEmail=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/files?userEmail=${encodeURIComponent(email)}`);
       const data = await res.json();
       if (data.success) setMyFilesAll(data.files);
     } catch (err) {
@@ -271,13 +284,13 @@ export default function UserDashboard() {
     const params = new URLSearchParams();
     params.set("userEmail", currentUser.email);
 
-    if (catFilter  !== "All") params.set("category",  catFilter);
-    if (typeFilter !== "All") params.set("type",       typeFilter);
-    if (subFilter  !== "All") params.set("subject",    subFilter);
-    if (search.trim())        params.set("search",     search.trim());
+    if (subFilter !== "All") params.set("subject", subFilter);
+    if (catFilter !== "All") params.set("category", catFilter);
+    if (typeFilter !== "All") params.set("type", typeFilter);
+    if (search.trim()) params.set("search", search.trim());
 
     try {
-      const res  = await fetch(`/api/files?${params}`);
+      const res = await fetch(`/api/files?${params}`);
       const data = await res.json();
       if (data.success) setFiles(data.files);
     } catch (err) {
@@ -297,21 +310,33 @@ export default function UserDashboard() {
       loadAllUserFiles(currentUser.email);
       loadFilteredUserFiles();
     }
-  }, [authChecking, currentUser, catFilter, typeFilter, subFilter, search]);
+  }, [authChecking, currentUser, subFilter, catFilter, typeFilter, search]);
 
-  function handleSelectSidebar(item: SidebarCategoryItem) {
-    setActiveSidebar(item.id);
-    setCat(item.category);
-    setType(item.type || "All");
+  function handleSelectFileType(item: FileTypeFilterItem) {
+    setActiveTypeId(item.id);
+    setCatFilter(item.category);
+    setTypeFilter(item.type || "All");
   }
 
-  function getItemCount(item: SidebarCategoryItem): number {
-    if (item.category === "All") return myFilesAll.length;
+  function countFilesForSubject(subjectName: string): number {
+    if (subjectName === "All") return myFilesAll.length;
+    return myFilesAll.filter(
+      (f) => (f.subject || "").toLowerCase() === subjectName.toLowerCase()
+    ).length;
+  }
+
+  function countFilesForType(item: FileTypeFilterItem): number {
+    const matchingSubjectFiles = myFilesAll.filter(f => {
+      if (subFilter === "All") return true;
+      return (f.subject || "").toLowerCase() === subFilter.toLowerCase();
+    });
+
+    if (item.category === "All") return matchingSubjectFiles.length;
     if (item.id === "others" || item.category === "Others" || item.type === "Other") {
-      return myFilesAll.filter(f => f.category === "Others" || f.type === "Other").length;
+      return matchingSubjectFiles.filter(f => f.category === "Others" || f.type === "Other").length;
     }
     if (item.type) {
-      return myFilesAll.filter(f => {
+      return matchingSubjectFiles.filter(f => {
         const t = (f.type || "").toLowerCase();
         if (item.type === "PDF") return t.includes("pdf");
         if (item.type === "Word") return t.includes("doc") || t.includes("word") || t.includes("rtf");
@@ -320,7 +345,7 @@ export default function UserDashboard() {
         return t.includes(item.type!.toLowerCase());
       }).length;
     }
-    return myFilesAll.filter(f => f.category === item.category).length;
+    return matchingSubjectFiles.filter(f => f.category === item.category).length;
   }
 
   const totalBytes = myFilesAll.reduce((sum, f) => sum + (f.size_bytes || 0), 0);
@@ -399,7 +424,7 @@ export default function UserDashboard() {
                   {currentUser?.name}&apos;s Dashboard
                 </h2>
                 <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                  Category-wise overview of your uploaded files
+                  Subject-wise overview of your uploaded files
                 </p>
               </div>
             </div>
@@ -418,44 +443,70 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* ── Dashboard Body (Category Sidebar + Files Grid) ── */}
+        {/* ── Dashboard Body (Subject Sidebar + Files Content) ── */}
         <div className="dashboard-body">
-          {/* Left Category Sidebar */}
+          {/* Left Subject Sidebar */}
           <aside className="sidebar">
-            <h2 className="sidebar-title">My Categories</h2>
-            <nav className="sidebar-nav">
-              {SIDEBAR_ITEMS.map((item) => {
-                const isActive = activeSidebarId === item.id;
-                const count    = getItemCount(item);
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`sidebar-item ${isActive ? "active" : ""}`}
-                    onClick={() => handleSelectSidebar(item)}
-                  >
-                    <span className="sidebar-item-label">
-                      <span className="sidebar-icon">{item.icon}</span>
-                      <span>{item.label}</span>
-                    </span>
-                    <span className="sidebar-count">{count}</span>
-                  </button>
-                );
-              })}
-            </nav>
-            <div style={{ marginTop: "auto", padding: "16px", background: "rgba(255,255,255,0.03)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)", fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: "1.5", textAlign: "center", display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div>
-                © 2026 design and develop by <a href="https://www.codetriolanka.lk/" target="_blank" rel="noopener noreferrer" style={{ color: "#a5b4fc", textDecoration: "none", fontWeight: "600" }}>CodeTrioLanka</a>. All rights reserved.
-              </div>
-              <div style={{ paddingTop: "8px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                Core Developer is <a href="https://www.codetriolanka.lk/team/chalana-jayod" target="_blank" rel="noopener noreferrer" style={{ color: "#34d399", textDecoration: "none", fontWeight: "600" }}>Chalana Jayod</a>
+            <h2 className="sidebar-title">My Subjects</h2>
+
+            {/* Sidebar Subject Search */}
+            <div style={{ padding: "0 4px", marginBottom: "4px" }}>
+              <div className="search-wrap" style={{ minWidth: "100%" }}>
+                <span className="search-icon" style={{ fontSize: "0.8rem", left: "10px" }}>🔍</span>
+                <input
+                  className="search-input"
+                  placeholder="Search my subjects…"
+                  value={subjectSearch}
+                  onChange={(e) => setSubjectSearch(e.target.value)}
+                  style={{ fontSize: "0.8rem", padding: "6px 8px 6px 30px", borderRadius: "8px" }}
+                />
               </div>
             </div>
+
+            <nav className="sidebar-nav">
+              {/* All Subjects Option */}
+              {(!subjectSearch || "all my subjects".includes(subjectSearch.toLowerCase())) && (
+                <button
+                  type="button"
+                  className={`sidebar-item ${subFilter === "All" ? "active" : ""}`}
+                  onClick={() => setSubFilter("All")}
+                >
+                  <span className="sidebar-item-label">
+                    <span className="sidebar-icon">📚</span>
+                    <span>All My Subjects</span>
+                  </span>
+                  <span className="sidebar-count">{countFilesForSubject("All")}</span>
+                </button>
+              )}
+
+              {/* Dynamic Subject Items */}
+              {subjects
+                .filter((s) => s.name.toLowerCase().includes(subjectSearch.toLowerCase()))
+                .map((s) => {
+                  const isActive = subFilter.toLowerCase() === s.name.toLowerCase();
+                  const icon = getSubjectIcon(s.name);
+                  const count = countFilesForSubject(s.name);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className={`sidebar-item ${isActive ? "active" : ""}`}
+                      onClick={() => setSubFilter(s.name)}
+                    >
+                      <span className="sidebar-item-label">
+                        <span className="sidebar-icon">{icon}</span>
+                        <span>{s.name}</span>
+                      </span>
+                      <span className="sidebar-count">{count}</span>
+                    </button>
+                  );
+                })}
+            </nav>
           </aside>
 
           {/* Main Content Area */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-            {/* Top Filter Bar */}
+          <div className="main-content-area">
+            {/* Top Filter Bar (Search + File Type Pills) */}
             <div className="filter-bar">
               <div className="filter-inner">
                 <div className="search-wrap">
@@ -468,19 +519,35 @@ export default function UserDashboard() {
                   />
                 </div>
 
-                <select className="filter-select" value={subFilter} onChange={(e) => setSub(e.target.value)}>
-                  <option value="All">All Subjects</option>
-                  {subjects.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
-                </select>
+                {/* File Type Filter Pills */}
+                <div className="subject-filters-bar">
+                  <span className="subject-filter-label">File Type:</span>
+                  {FILE_TYPE_FILTERS.map((item) => {
+                    const isActive = activeTypeId === item.id;
+                    const count = countFilesForType(item);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`subject-pill ${isActive ? "active" : ""}`}
+                        onClick={() => handleSelectFileType(item)}
+                      >
+                        <span>{item.icon}</span>
+                        {item.label}
+                        <span className="subject-pill-count">{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-                {(activeSidebarId !== "all" || subFilter !== "All" || search) && (
+                {(subFilter !== "All" || activeTypeId !== "all" || search) && (
                   <button
                     className="btn-clear"
                     onClick={() => {
-                      setActiveSidebar("all");
-                      setCat("All");
-                      setType("All");
-                      setSub("All");
+                      setSubFilter("All");
+                      setActiveTypeId("all");
+                      setCatFilter("All");
+                      setTypeFilter("All");
                       setSearch("");
                     }}
                   >
@@ -500,11 +567,13 @@ export default function UserDashboard() {
               ) : files.length === 0 ? (
                 <div className="state-msg">
                   <span style={{ fontSize: "3rem" }}>📂</span>
-                  <p>No files uploaded in this category yet. Click &quot;Upload File&quot; to add your first file!</p>
+                  <p>No files uploaded in this subject yet. Click &quot;Upload File&quot; to add your first file!</p>
                 </div>
-              ) : activeSidebarId === "all" ? (
+              ) : activeTypeId === "all" ? (
                 <>
-                  <p className="results-count">{files.length} file{files.length !== 1 ? "s" : ""} in total</p>
+                  <p className="results-count">
+                    {files.length} file{files.length !== 1 ? "s" : ""} {subFilter !== "All" && `in ${subFilter}`}
+                  </p>
                   <div style={{ display: "flex", flexDirection: "column", gap: "32px", width: "100%" }}>
                     {Object.entries(
                       files.reduce((acc, file) => {
@@ -538,7 +607,9 @@ export default function UserDashboard() {
                 </>
               ) : (
                 <>
-                  <p className="results-count">{files.length} file{files.length !== 1 ? "s" : ""} in this category</p>
+                  <p className="results-count">
+                    {files.length} file{files.length !== 1 ? "s" : ""} {subFilter !== "All" && `in ${subFilter}`}
+                  </p>
                   <div className="file-grid">
                     {files.map((f) => (
                       <FileCard
@@ -557,6 +628,25 @@ export default function UserDashboard() {
             </main>
           </div>
         </div>
+
+        {/* ── Page Footer ── */}
+        <footer className="app-footer">
+          <div className="app-footer-inner">
+            <div>
+              © 2026 design and develop by{" "}
+              <a href="https://www.codetriolanka.lk/" target="_blank" rel="noopener noreferrer" className="app-footer-link">
+                CodeTrioLanka
+              </a>
+              . All rights reserved.
+            </div>
+            <div>
+              Core Developer is{" "}
+              <a href="https://www.codetriolanka.lk/team/chalana-jayod" target="_blank" rel="noopener noreferrer" className="app-footer-dev">
+                CJ
+              </a>
+            </div>
+          </div>
+        </footer>
       </div>
 
       {/* Upload Modal */}
