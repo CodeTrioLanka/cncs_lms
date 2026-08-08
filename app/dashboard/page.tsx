@@ -6,6 +6,7 @@ import Link from "next/link";
 import StorageModal from "@/app/components/StorageModal";
 import UploadModal from "@/app/components/UploadModal";
 import FilePreviewModal from "@/app/components/FilePreviewModal";
+import ChangeSubjectModal from "@/app/components/ChangeSubjectModal";
 
 // ── Types & Interfaces ────────────────────────────────────────────────────────
 export interface LMSUser {
@@ -106,11 +107,13 @@ function FileCard({
   currentUser,
   onDeleteSuccess,
   onPreviewFile,
+  onChangeSubject,
 }: {
   file: LMSFile;
   currentUser: LMSUser | null;
   onDeleteSuccess?: () => void;
   onPreviewFile?: (file: LMSFile) => void;
+  onChangeSubject?: (file: LMSFile) => void;
 }) {
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const style = TYPE_COLORS[file.type] || { bg: "#e2e8f0", text: "#334155", icon: "📄" };
@@ -208,6 +211,17 @@ function FileCard({
           <button
             type="button"
             className="btn-delete-file"
+            title="Change subject"
+            style={{ background: "rgba(99,102,241,0.15)", color: "#a5b4fc" }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (onChangeSubject) onChangeSubject(file); }}
+          >
+            ✏️
+          </button>
+        )}
+        {isOwner && (
+          <button
+            type="button"
+            className="btn-delete-file"
             title="Delete file"
             onClick={handleDelete}
             disabled={isDeleting}
@@ -233,6 +247,7 @@ export default function UserDashboard() {
   const [showModal, setModal] = useState<boolean>(false);
   const [showStorageModal, setStorageModal] = useState<boolean>(false);
   const [previewFile, setPreviewFile] = useState<LMSFile | null>(null);
+  const [changeSubjectFile, setChangeSubjectFile] = useState<LMSFile | null>(null);
 
   // ── View State & Filters ──
   const [view, setView] = useState<"cards" | "files">("cards");
@@ -645,6 +660,7 @@ export default function UserDashboard() {
                                 loadFilteredUserFiles(sidebarSubject, activeTypeId, search);
                               }}
                               onPreviewFile={(targetFile) => setPreviewFile(targetFile)}
+                              onChangeSubject={(targetFile) => setChangeSubjectFile(targetFile)}
                             />
                           ))}
                         </div>
@@ -697,6 +713,24 @@ export default function UserDashboard() {
       {/* File Preview Modal */}
       {previewFile && (
         <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
+      )}
+      {/* Change Subject Modal */}
+      {changeSubjectFile && (
+        <ChangeSubjectModal
+          fileId={String(changeSubjectFile.id)}
+          fileName={changeSubjectFile.name}
+          currentSubject={changeSubjectFile.subject || null}
+          subjects={subjects}
+          onClose={() => setChangeSubjectFile(null)}
+          onSuccess={(newSubject) => {
+            const updater = (f: LMSFile) =>
+              String(f.id) === String(changeSubjectFile.id) ? { ...f, subject: newSubject } : f;
+            setFiles((prev) => prev.map(updater));
+            setMyFilesAll((prev) => prev.map(updater));
+            loadSubjects();
+            setChangeSubjectFile(null);
+          }}
+        />
       )}
     </>
   );

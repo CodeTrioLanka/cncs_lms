@@ -202,3 +202,56 @@ export async function deleteVideo(videoIdOrUrl: string): Promise<boolean> {
         throw error;
     }
 }
+
+/**
+ * Updates the description and tags of an existing YouTube video to reflect a new subject.
+ *
+ * Fetches the current snippet first (required by YouTube API to preserve title/categoryId),
+ * then patches in the new subject-based description and tags.
+ *
+ * @param videoIdOrUrl  The YouTube video ID or full URL.
+ * @param newSubject    The new subject name to embed in the metadata.
+ */
+export async function updateYouTubeVideoMetadata(
+    videoIdOrUrl: string,
+    newSubject: string,
+    fileName?: string
+): Promise<void> {
+    const videoId = extractYouTubeVideoId(videoIdOrUrl);
+    if (!videoId) {
+        throw new Error("Invalid YouTube video ID for metadata update.");
+    }
+
+    // Fetch the current snippet so we don't accidentally overwrite title / categoryId
+    const getRes = await youtube.videos.list({
+        part: ["snippet"],
+        id: [videoId],
+    });
+
+    const currentSnippet = getRes.data.items?.[0]?.snippet;
+    if (!currentSnippet) {
+        throw new Error(`YouTube video not found (id: ${videoId}).`);
+    }
+
+    const updatedDescription =
+        `Subject: ${newSubject}\n` +
+        (fileName ? `File: ${fileName}\n` : "") +
+        `\nUploaded via CNCS LMS — ${new Date().toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" })}`;
+
+    // Generate clean tags for the new subject, completely replacing old subject tags
+    const subjectTag = newSubject.trim().toLowerCase().replace(/\s+/g, "-");
+    const updatedTags = ["cncs", "lms", `subject-${subjectTag}`, newSubject];
+
+    await youtube.videos.update({
+        part: ["snippet"],
+        requestBody: {
+            id: videoId,
+            snippet: {
+                ...currentSnippet,
+                description: updatedDescription,
+                tags: updatedTags,
+                categoryId: currentSnippet.categoryId || "27",
+            },
+        },
+    });
+}

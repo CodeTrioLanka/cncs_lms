@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 export interface Subject {
   id: number;
@@ -80,10 +80,7 @@ const TYPE_COLORS: Record<string, { bg: string; text: string; icon: string }> = 
 export default function UploadModal({ subjects, defaultUploaderEmail, onClose, onSuccess }: UploadModalProps) {
   const [file, setFile]                 = useState<File | null>(null);
   const [detected, setDetected]         = useState<DetectedInfo | null>(null);
-  const [subject, setSubject]           = useState<string>("");
-  const [newSubject, setNewSubj]        = useState<string>("");
-  const [isAssign, setIsAssign]         = useState<boolean>(false);
-  const [sharedWith, setShared]         = useState<string>("");
+  const [subjectInput, setSubjectInput]  = useState<string>("");
   const [uploadedBy]                    = useState<string>(defaultUploaderEmail || "");
   const [storageType, setStorageType]   = useState<StorageType>("GOOGLE_DRIVE");
   const [isAutoRouted, setIsAutoRouted] = useState<boolean>(false);
@@ -95,10 +92,58 @@ export default function UploadModal({ subjects, defaultUploaderEmail, onClose, o
   const [isDragging, setIsDragging]     = useState<boolean>(false);
   const fileRef                         = useRef<HTMLInputElement>(null);
 
-  function detectType(mimeType: string, filename: string, isAssignment: boolean): DetectedInfo {
-    if (isAssignment) {
-      return { category: "Assignments", type: ".assignment", typeLabel: "Assignment", pathParts: ["Assignments"] };
+  // --- Autocomplete state ---
+  const [suggestions, setSuggestions]     = useState<Subject[]>([]);
+  const [showSuggestions, setShowSugg]    = useState<boolean>(false);
+  const [activeIndex, setActiveIndex]     = useState<number>(-1);
+  const subjectWrapRef                    = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (subjectWrapRef.current && !subjectWrapRef.current.contains(e.target as Node)) {
+        setShowSugg(false);
+      }
     }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleSubjectChange(value: string) {
+    setSubjectInput(value);
+    setActiveIndex(-1);
+    if (value.trim() === "") {
+      setSuggestions([]);
+      setShowSugg(false);
+      return;
+    }
+    const filtered = subjects.filter((s) =>
+      s.name.toLowerCase().includes(value.toLowerCase())
+    );
+    setSuggestions(filtered);
+    setShowSugg(filtered.length > 0);
+  }
+
+  function handleSubjectKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!showSuggestions) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      setSubjectInput(suggestions[activeIndex].name);
+      setShowSugg(false);
+      setSuggestions([]);
+      setActiveIndex(-1);
+    } else if (e.key === "Escape") {
+      setShowSugg(false);
+    }
+  }
+
+  function detectType(mimeType: string, filename: string): DetectedInfo {
 
     const lowerName = (filename || "").toLowerCase();
     const rawExt = lowerName.includes(".") ? lowerName.split(".").pop() || "" : "";
@@ -192,7 +237,7 @@ export default function UploadModal({ subjects, defaultUploaderEmail, onClose, o
 
   function handleFileSelect(f: File) {
     setFile(f);
-    const info = detectType(f.type, f.name, isAssign);
+    const info = detectType(f.type, f.name);
     setDetected(info);
     setError("");
 
@@ -229,12 +274,6 @@ export default function UploadModal({ subjects, defaultUploaderEmail, onClose, o
     if (f) handleFileSelect(f);
   }
 
-  function handleAssignToggle(e: React.ChangeEvent<HTMLInputElement>) {
-    const checked = e.target.checked;
-    setIsAssign(checked);
-    if (file) setDetected(detectType(file.type, file.name, checked));
-  }
-
   function get1stLevelDestinationFolder(
     category: string,
     storage: StorageType
@@ -255,14 +294,14 @@ export default function UploadModal({ subjects, defaultUploaderEmail, onClose, o
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file)                   return setError("Please choose a file.");
-    if (!subject && !newSubject) return setError("Please select or enter a subject.");
+    if (!subjectInput.trim()) return setError("Please select or enter a subject.");
 
     setLoading(true);
     setProgress(0);
     setStatusText(storageType === "YOUTUBE" ? "Initializing YouTube upload…" : "Initializing Drive upload…");
     setError("");
 
-    const targetSubject = newSubject.trim() || subject;
+    const targetSubject = subjectInput.trim();
 
     try {
       // Step 1: Request direct upload session URL from Next.js API (Lightweight JSON)
@@ -274,7 +313,6 @@ export default function UploadModal({ subjects, defaultUploaderEmail, onClose, o
           mimeType: file.type || "application/octet-stream",
           fileSize: file.size,
           subject: targetSubject,
-          isAssignment: isAssign,
           uploadedBy: uploadedBy.trim(),
           storageType: storageType,
         }),
@@ -352,7 +390,6 @@ export default function UploadModal({ subjects, defaultUploaderEmail, onClose, o
           mimeType: file.type || "application/octet-stream",
           fileSize: file.size,
           subject: targetSubject,
-          isAssignment: isAssign,
           uploadedBy: uploadedBy.trim(),
           storageType: storageType,
         }),
@@ -479,29 +516,61 @@ export default function UploadModal({ subjects, defaultUploaderEmail, onClose, o
             </div>
           )}
 
-          {/* Mark as Assignment Checkbox */}
-          <label className="checkbox-row" style={{ display: "flex", alignItems: "center", gap: "8px", cursor: loading ? "not-allowed" : "pointer", fontSize: "0.85rem", margin: "4px 0" }}>
-            <input type="checkbox" checked={isAssign} onChange={handleAssignToggle} disabled={loading} style={{ width: "16px", height: "16px", cursor: "pointer" }} />
-            <span>📋 Mark as Assignment</span>
-          </label>
-
-          {/* Subject select */}
-          <div className="field-group">
+          {/* Subject autocomplete textbox */}
+          <div className="field-group" ref={subjectWrapRef} style={{ position: "relative" }}>
             <label>Subject *</label>
-            <select value={subject} onChange={(e) => setSubject(e.target.value)} disabled={loading}>
-              <option value="">— Select subject —</option>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.name}>{s.name}</option>
-              ))}
-            </select>
-            <p className="field-or">or add new subject:</p>
             <input
               type="text"
-              placeholder="e.g. Mathematics"
-              value={newSubject}
-              onChange={(e) => setNewSubj(e.target.value)}
+              placeholder="Type to search or enter a new subject…"
+              value={subjectInput}
+              onChange={(e) => handleSubjectChange(e.target.value)}
+              onKeyDown={handleSubjectKeyDown}
+              onFocus={() => subjectInput.trim() && setShowSugg(suggestions.length > 0)}
               disabled={loading}
+              autoComplete="off"
             />
+            {showSuggestions && (
+              <ul style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                right: 0,
+                zIndex: 999,
+                margin: "2px 0 0",
+                padding: 0,
+                listStyle: "none",
+                background: "#1e1e2e",
+                border: "1px solid rgba(99,102,241,0.4)",
+                borderRadius: "8px",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+                maxHeight: "180px",
+                overflowY: "auto",
+              }}>
+                {suggestions.map((s, i) => (
+                  <li
+                    key={s.id}
+                    onMouseDown={() => {
+                      setSubjectInput(s.name);
+                      setShowSugg(false);
+                      setSuggestions([]);
+                      setActiveIndex(-1);
+                    }}
+                    style={{
+                      padding: "9px 14px",
+                      cursor: "pointer",
+                      fontSize: "0.875rem",
+                      color: i === activeIndex ? "#fff" : "#c4c4d4",
+                      background: i === activeIndex ? "rgba(99,102,241,0.35)" : "transparent",
+                      borderBottom: i < suggestions.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={() => setActiveIndex(i)}
+                  >
+                    {s.name}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* Uploader email (Disabled) */}
@@ -512,18 +581,6 @@ export default function UploadModal({ subjects, defaultUploaderEmail, onClose, o
               value={uploadedBy}
               disabled
               style={{ opacity: 0.7, cursor: "not-allowed", background: "rgba(255,255,255,0.04)" }}
-            />
-          </div>
-
-          {/* Share with */}
-          <div className="field-group">
-            <label>Share with (optional)</label>
-            <input
-              type="text"
-              placeholder="student1@gmail.com, student2@gmail.com"
-              value={sharedWith}
-              onChange={(e) => setShared(e.target.value)}
-              disabled={loading}
             />
           </div>
 

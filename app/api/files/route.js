@@ -2,7 +2,7 @@ import dbConnect from "@/lib/database";
 import File from "@/models/File";
 import Subject from "@/models/Subject";
 import drive from "@/services/drive.service";
-import { deleteVideo } from "@/services/youtube.service";
+import { deleteVideo, updateYouTubeVideoMetadata } from "@/services/youtube.service";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
@@ -184,6 +184,100 @@ export async function DELETE(request) {
     console.error("[File Delete API Error]", error);
     return NextResponse.json(
       { success: false, error: error.message || "Failed to delete file." },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PATCH /api/files
+ *
+ * Body: { fileId: string, newSubject: string }
+ *
+ * Allows the uploader of a file to change its subject.
+ * Creates the subject in MongoDB if it doesn't exist yet.
+ */
+export async function PATCH(request) {
+  try {
+    await dbConnect();
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get("lms_session")?.value;
+
+    if (!sessionToken) {
+      return NextResponse.json({ success: false, error: "Unauthorized. Please log in." }, { status: 401 });
+    }
+
+    let currentUser;
+    try {
+      const sessionData = Buffer.from(sessionToken, "base64").toString("utf-8");
+      currentUser = JSON.parse(sessionData);
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid session token." }, { status: 401 });
+    }
+
+    if (!currentUser?.email) {
+      return NextResponse.json({ success: false, error: "Unauthorized user." }, { status: 401 });
+    }
+
+    const { fileId, newSubject } = await request.json();
+
+    if (!fileId) {
+      return NextResponse.json({ success: false, error: "File ID is required." }, { status: 400 });
+    }
+    if (!newSubject || !newSubject.trim()) {
+      return NextResponse.json({ success: false, error: "New subject name is required." }, { status: 400 });
+    }
+
+    const file = await File.findById(fileId);
+    if (!file) {
+      return NextResponse.json({ success: false, error: "File not found." }, { status: 404 });
+    }
+
+    // Only the uploader can change the subject
+    if (file.uploaded_by?.trim().toLowerCase() !== currentUser.email?.trim().toLowerCase()) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden. Only the uploader can change the subject." },
+        { status: 403 }
+      );
+    }
+
+    // Upsert subject (creates it if new)
+    const subjectDoc = await Subject.findOneAndUpdate(
+      { name: newSubject.trim() },
+      { $setOnInsert: { name: newSubject.trim() } },
+      { upsert: true, returnDocument: "after" }
+    );
+
+    file.subject_id = subjectDoc._id;
+    await file.save();
+
+    // If the file is a YouTube video, also update its metadata on YouTube
+    let youtubeMetadataError = null;
+    if (file.storage_type === "YOUTUBE" && file.drive_file_id) {
+      try {
+        await updateYouTubeVideoMetadata(
+          file.drive_file_id,
+          subjectDoc.name,
+          file.name
+        );
+      } catch (ytErr) {
+        const errMsg = ytErr?.response?.data?.error?.message || ytErr?.message || String(ytErr);
+        console.warn("[YouTube Metadata Update Warning]", errMsg);
+        youtubeMetadataError = errMsg;
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Subject updated successfully.",
+      subject: subjectDoc.name,
+      ...(youtubeMetadataError && { youtubeMetadataError }),
+    });
+
+  } catch (error) {
+    console.error("[File PATCH API Error]", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to update subject." },
       { status: 500 }
     );
   }
